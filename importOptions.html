@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choose Import Type</title>
+    <link rel="stylesheet" th:href="@{/style.css}">
+</head>
+<body>
+    <p th:text="${confirmationMessage}"></p> <!-- Show confirmation message -->
+    <h1>Select Import Type</h1>
+
+    <!-- Form for Bulk Import Skill -->
+    <form method="GET" action="/skills/upload">
+        <input type="hidden" name="organizationName" th:value="${organizationName}">
+        <input type="hidden" name="environment" th:value="${environment}">
+        <button type="submit">1. Bulk Import Skill</button>
+    </form>
+
+    <!-- Form for Bulk Import Language Skill -->
+    <form method="GET" action="/skills/uploadLanguageSkill">
+        <input type="hidden" name="organizationName" th:value="${organizationName}">
+        <input type="hidden" name="environment" th:value="${environment}">
+        <button type="submit">2. Bulk Import Language Skill</button>
+    </form>
+
+    <!-- Form for Bulk Import Wrap-Up Code -->
+    <form method="GET" action="/skills/uploadWrapUpCode">
+        <input type="hidden" name="organizationName" th:value="${organizationName}">
+        <input type="hidden" name="environment" th:value="${environment}">
+        <button type="submit">3. Bulk Import Wrap-Up Code</button>
+    </form>
+
+</body>
+</html>
