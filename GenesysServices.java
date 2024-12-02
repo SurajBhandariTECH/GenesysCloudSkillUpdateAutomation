@@ -16,7 +16,6 @@ import com.mypurecloud.sdk.v2.ApiClient;
 import com.mypurecloud.sdk.v2.ApiException;
 import com.mypurecloud.sdk.v2.Configuration;
 import com.mypurecloud.sdk.v2.api.RoutingApi;
-import com.mypurecloud.sdk.v2.api.request.GetIntegrationsTypeConfigschemaRequest.configTypeValues;
 import com.mypurecloud.sdk.v2.model.RoutingSkill;
 
 
@@ -36,8 +35,7 @@ public class GenesysServices {
 		String clientId = credentials.get("clientId");
 		String clientSecret = credentials.get("clientSecret");
 		
-		System.out.println("clientId"+clientId+" client Secret"+clientSecret);
-		if(clientId==null || clientSecret==null) {
+			if(clientId==null || clientSecret==null) {
 			results.add("Error: Client Credentials not found for organization"+organizationName);
 			return results;
 		}
@@ -140,8 +138,6 @@ public class GenesysServices {
 							continue;
 						}
 						skillNames.add(skillName); //add valid skill name
-				}else {
-//					skillNames.add("Error: Missing Skill Name at row '" + rowNumber +".");
 				}
 				
 			}
