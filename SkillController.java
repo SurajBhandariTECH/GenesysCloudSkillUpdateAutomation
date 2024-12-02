@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.example.Bulk_Skill_Creation.service.GenesysServices;
+import com.example.Bulk_Skill_Creation.service.LanguageSkillServices;
 import com.example.Bulk_Skill_Creation.service.OrgConfigService;
 import com.mypurecloud.sdk.v2.ApiClient;
 import com.mypurecloud.sdk.v2.Configuration;
@@ -32,6 +33,9 @@ public class SkillController {
 	
 	@Autowired
 	private GenesysServices genesysService;
+	
+	@Autowired
+	private LanguageSkillServices languageSkillServices;
 	
 	public SkillController(GenesysServices genesysService) {
 		this.genesysService = genesysService;
@@ -79,7 +83,7 @@ public class SkillController {
 			session.setAttribute("environment", environment);
 			session.setAttribute("credentials", credentials);
 			
-		//add confirmation message and redirect to the upload page
+		//add confirmation message and redirect to the import page
 			 redirectAttributes.addFlashAttribute("confirmationMessage", "Connected to Genesys org: " + organizationName);
 			 
 		//save organization and environment in session or attributes for next page
@@ -106,34 +110,58 @@ public class SkillController {
 	
 	 // Show choose import options page
     @GetMapping("/importOptions")
-    public String showChooseImportPage(@ModelAttribute("organizationName") String organizationName,
-                                       @ModelAttribute("environment") String environment,
-                                       @ModelAttribute("confirmationMessage") String confirmationMessage, Model model) {
-        model.addAttribute("organizationName", organizationName);
-        model.addAttribute("environment", environment);
-        model.addAttribute("confirmationMessage", confirmationMessage); // Add confirmation message to model
-        return "importOptions";
+    public String showChooseImportPage(HttpSession session, Model model) {
+    	String organizationName = (String) session.getAttribute("organizationName");
+	    String environment = (String) session.getAttribute("environment");
+
+	    if (organizationName == null || environment == null) {
+	        model.addAttribute("errorMessage", "Session expired. Please log in again.");
+	        return "login";
+	    }
+
+	    String confirmationMessage = "Connected to Genesys org: " + organizationName;
+	    model.addAttribute("confirmationMessage", confirmationMessage);
+	    model.addAttribute("organizationName", organizationName);
+	    model.addAttribute("environment", environment);
+
+	    return "importOptions";
     }
 	//show upload page for bulk skill
 	@GetMapping("/upload")
-	public String showUploadPage(@ModelAttribute("organizationName")String organizationName,
-								@ModelAttribute("environment")String environment,
-								@ModelAttribute("confirmationMessage")String confirmationMessage,Model model) {
+	public String showUploadPage(HttpSession session,Model model) {
 		
-		model.addAttribute("organizationName",organizationName);
-		model.addAttribute("environment",environment);
-		model.addAttribute("confirmationMessage",confirmationMessage);
-		return "upload";
+		 String organizationName = (String) session.getAttribute("organizationName");
+		    String environment = (String) session.getAttribute("environment");
+
+		    if (organizationName == null || environment == null) {
+		        model.addAttribute("errorMessage", "Session expired. Please log in again.");
+		        return "login";
+		    }
+
+		    String confirmationMessage = "Connected to Genesys org: " + organizationName;
+		    model.addAttribute("confirmationMessage", confirmationMessage);
+		    model.addAttribute("organizationName", organizationName);
+		    model.addAttribute("environment", environment);
+
+		    return "upload";
 	}
 	
 	 // Show upload page for Bulk Language Skill
     @GetMapping("/uploadLanguageSkill")
-    public String showUploadLanguageSkillPage(@ModelAttribute("organizationName") String organizationName,
-                                              @ModelAttribute("environment") String environment,
-                                              @ModelAttribute("confirmationMessage") String confirmationMessage, Model model) {
-        model.addAttribute("organizationName", organizationName);
-        model.addAttribute("environment", environment);
-        model.addAttribute("confirmationMessage", confirmationMessage); // Add confirmation message to model
+    public String showUploadLanguageSkillPage(HttpSession session, Model model) {
+    	String organizationName = (String) session.getAttribute("organizationName");
+	    String environment = (String) session.getAttribute("environment");
+
+	    if (organizationName == null || environment == null) {
+	        model.addAttribute("errorMessage", "Session expired. Please log in again.");
+	        return "login";
+	    }
+
+	    String confirmationMessage = "Connected to Genesys org: " + organizationName;
+	    model.addAttribute("confirmationMessage", confirmationMessage);
+	    model.addAttribute("organizationName", organizationName);
+	    model.addAttribute("environment", environment);
+
         return "uploadLanguageSkill"; // Create this page for Language Skill upload
     }
 
@@ -151,14 +179,19 @@ public class SkillController {
     @PostMapping("/upload")
     public String handleSkillFileUpload(@RequestParam("file") MultipartFile file,
                                         HttpSession session, Model model) {
-        return handleFileUpload(file, session, model,"");
+//    	 model.addAttribute("confirmationMessage", confirmationMessage);
+        return handleFileUpload(file, session, model);
+        
     }
 
     // Handle File Upload for Bulk Language Skills
     @PostMapping("/uploadLanguageSkill")
     public String handleLanguageSkillFileUpload(@RequestParam("file") MultipartFile file,
-                                                HttpSession session, Model model) {
-        return handleFileUpload(file, session, model, "LanguageSkill");
+                                                HttpSession httpSession,
+                                                RedirectAttributes redirectAttributes,
+                                                Model model) {
+    	
+        return handleLanguageSkillFile(file, httpSession, model,redirectAttributes);
     }
 	
  // Handle File Upload for Bulk Wrap-Up Code (with different validation and functionality)
@@ -173,7 +206,7 @@ public class SkillController {
 	
 	public String handleFileUpload(MultipartFile file,
 			HttpSession httpSession,
-			Model model,String type){
+			Model model){
 		
 		
 
@@ -192,13 +225,13 @@ public class SkillController {
 				if(credentials ==null || !orgConfigService.validateCredentials(credentials,environment)) {
 						throw new IllegalArgumentException("Client credentials have changed or are invalid. Please log in again:");
 					}
-			
+				
 		//process the CSV file and create Skill
 				List<String> results = genesysService.createSkillFromCsv(file, organizationName,environment);
 		//add the confirmation message and results to the redirect attributes so it can be displayed in the success message
 				model.addAttribute("confirmationMessage","Connect to Genesys org:"+organizationName);
 				model.addAttribute("results",results);
-				model.addAttribute("successMessage"," Upload successfully");
+				model.addAttribute("successMessage","Skill Upload successfully");
 		
 //				redirectAttributes.addFlashAttribute("results",results);
 				
@@ -207,13 +240,55 @@ public class SkillController {
 				return "login";
 			}catch(IOException e) {
 				model.addAttribute("errorMessage","File process error: "+e.getMessage());
-				return "upload"+type;
+				return "upload";
 			}catch(Exception e) {
 				model.addAttribute("errorMessage","Error processing the files:"+e.getMessage());
-				return "upload"+type;
+				return "upload";
 			}
-		return "upload"+type;
+		return "upload";
 		}
+	
+	private String handleLanguageSkillFile(MultipartFile file, HttpSession httpSession, Model model, RedirectAttributes redirectAttributes) {
+			
+		
+		try {
+			String organizationName = (String)httpSession.getAttribute("organizationName");
+			String environment = (String)httpSession.getAttribute("environment");
+			
+			if(organizationName==null || environment==null) {
+				model.addAttribute("errorMessage","Session expired. Please login again.");
+				return "login";
+			}
+			
+			@SuppressWarnings("unchecked")
+			Map<String, String> credentials = (Map<String,String>)httpSession.getAttribute("credentials");
+			if(credentials==null || !orgConfigService.validateCredentials(credentials, environment)) {
+				throw new IllegalArgumentException("Client credentials have changed or are invalid. Please login again.");
+			}
+			
+			//process the csv file and create language skills
+		 List<String> results =  languageSkillServices.createLanguageSkillFromCsv(file, organizationName, environment);
+			
+			//add result to model for display
+		//add the confirmation message and results to the redirect attributes so it can be displayed in the success message
+			model.addAttribute("confirmationMessage","Connect to Genesys org:"+organizationName);
+			model.addAttribute("results",results);
+			model.addAttribute("successMessage", "Language skills uploaded successfully.");
+			
+		    
+		}catch (IllegalArgumentException e) {
+	        model.addAttribute("errorMessage", e.getMessage());
+	        return "login";
+	    } catch (IOException e) {
+	        model.addAttribute("errorMessage", e.getMessage());
+	        return "uploadLanguageSkill";
+	    } catch (Exception e) {
+	        model.addAttribute("errorMessage", "Error processing the file: " + e.getMessage());
+	        return "uploadLanguageSkill";
+	    }
+		
+		return "uploadLanguageSkill";
+	}
 		
 	private String handleWrapUpCodeUpload(MultipartFile file, HttpSession session, Model model) {
         try {
