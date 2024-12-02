@@ -17,6 +17,7 @@ import com.mypurecloud.sdk.v2.ApiException;
 import com.mypurecloud.sdk.v2.Configuration;
 import com.mypurecloud.sdk.v2.api.RoutingApi;
 import com.mypurecloud.sdk.v2.model.RoutingSkill;
+import com.mypurecloud.sdk.v2.model.SkillEntityListing;
 
 
 @Service  //@Service Annotation to indicate that a class belongs to that layer. 
@@ -76,6 +77,63 @@ public class GenesysServices {
 		return results;
 	}
 	
+	
+	public List<String> deleteSkillsFromCSV(MultipartFile file, String organizationName, String environment)throws IOException{
+		List<String>  results = new ArrayList<>();
+		
+		//retrieve clientId and CientSecret for a specified org
+		Map<String, String> credentials = orgConfigService.getCredentials(organizationName);
+		String clientId = credentials.get("clientId");
+		String clientSecret = credentials.get("clientSecret");
+		
+		if(clientId==null || clientSecret==null) {
+			results.add("Error: Client Credentials not found for organization"+organizationName);
+			return results;
+		}
+		
+		try {
+			
+			ApiClient apiClient = ApiClient.Builder.standard().withBasePath("https://api."+environment).build();
+			apiClient.authorizeClientCredentials(clientId, clientSecret);
+			
+			Configuration.setDefaultApiClient(apiClient);
+			
+			 RoutingApi routingApi = new RoutingApi(apiClient);
+			 SkillEntityListing skillEntityListing = new SkillEntityListing();
+			
+			// Parse the CSV to extract skill names
+	        List<String> skillNames = parseCSVDelete(file);
+	        
+	        for(String skillName:skillNames) {
+	        	if(skillName.startsWith("Error: ")) {
+	        		results.add(skillName);
+	        		continue;
+	        	}
+	        	
+	        	 Integer pageSize = 100; // Integer | Page size
+	        	 Integer pageNumber = 1;
+	        	try {
+	        		//fetch skill by name and delete it
+		        		List<RoutingSkill> skills = routingApi.getRoutingSkills(pageSize,pageNumber,skillName,null).getEntities();
+		        		if (skills.isEmpty()) {
+		                    results.add("Skill not found: " + skillName);
+		                    continue;
+		                }
+		        		
+		        		for(RoutingSkill skill:skills) {
+		        			routingApi.deleteRoutingSkill(skill.getId());
+		        			results.add(" Successfully Delete Skill: "+skillName);
+		        		}
+	        		} catch (ApiException e) {
+	                results.add("Failed to delete skill: " + skillName + " (Error: " + e.getMessage() + ")");
+	            	}
+	        	}
+	    	} catch (Exception e) {
+	        results.add("Error initializing Genesys API client: " + e.getMessage());
+	    }
+	    return results;    	
+	   
+	}
 	 public List<String> createWrapUpCodeFromCsv(MultipartFile file, String organizationName, String environment) {
 	        List<String> results = new ArrayList<>();
 
@@ -147,4 +205,54 @@ public class GenesysServices {
 		return skillNames;
 	}
 	
+	private List<String> parseCSVDelete(MultipartFile file)throws IOException{
+		List<String> skillNames = new ArrayList<>();
+		//allowed : letters digits, underscore and space
+//		String skillNamePattern = "^[a-zA-Z0-9_ ]+$";
+		
+		try(InputStream inputStream = file.getInputStream();
+				Scanner scanner = new Scanner(inputStream,"UTF-8")){
+			
+			//skip the header row
+			if(scanner.hasNextLine()) {
+				String headerLine = scanner.nextLine();
+				headerLine= headerLine.replace("\uFEFF","");
+				String[] headers = headerLine.split(",");
+				System.out.println(headers[0].trim());
+				
+				//validate the header
+				if(headers.length==0 || !headers[0].equalsIgnoreCase("DeleteSkill Name")) {
+					throw new IllegalArgumentException("Invalid File Format: The first cell of first row must be 'DeleteSkill Name'.");
+				}
+			
+			}
+			
+			//read and validate each subsequent row
+			int rowNumber=1;
+			while(scanner.hasNextLine()) {
+				rowNumber++;
+				String line = scanner.nextLine();
+				String[] columns = line.split(",");
+				
+				if(columns.length>0 && !columns[0].trim().isEmpty()) {
+						String skillName = columns[0].trim();
+						
+						if(skillName.isEmpty()) {
+//							skillNames.add("Error: Empty skill name at row "+rowNumber+".");
+							continue;
+						}
+						
+//						if(!skillName.matches(skillNamePattern)) {
+//							skillNames.add("Error: Invalid skill name '"+skillName+"' at row "+rowNumber+". Only letters, digits, underscore, and space are allowed.");
+//							continue;
+//						}
+						skillNames.add(skillName); //add valid skill name
+				}
+				
+			}
+		}
+		
+				
+		return skillNames;
+	}
 }
