@@ -12,7 +12,7 @@
             <img src="/images/genesys-logo.png" alt="Genesys Logo" class="logo">
         </div>
         <div class="page-title">
-			<h1 >BULK-UPLOAD SKILLS</h1>
+			<h1 >BULK-UPLOAD/DELETE SKILLS</h1>
 		</div>
         
     </header>
@@ -20,14 +20,27 @@
 		<section>
 		    <h2 th:text="${confirmationMessage}"></h2>
 			<form method="post" action="/skills/upload" enctype="multipart/form-data">
+				 <h3>CREATE SKILLS</h3>
 				<input type="hidden" name="organizationName" th:value="${session.organizationName}"/>
 				<input type="hidden" name="environment" th:value="${session.environment}"/>
 			
-				<label for = "file">Upload CSV File:</label>
-				<input type="file" id="file" name="file" accept=".csv" required><br><br>
+				<label for = "create-file">Upload CSV File:</label>
+				<input type="file" id="create-file" name="file" accept=".csv" required><br><br>
 				
-				<button type="submit">Upload And Process</button>
+				<button type="submit" class="create-button">Upload And Create skills</button>
 			</form>
+			
+			   <!-- Upload and Delete Skills -->
+            <form method="post" action="/skills/deleteSkill" enctype="multipart/form-data">
+                <h3>DELETE SKILLS</h3>
+                <input type="hidden" name="organizationName" th:value="${session.organizationName}"/>
+                <input type="hidden" name="environment" th:value="${session.environment}"/>
+            
+                <label for="delete-file">Select CSV File:</label>
+                <input type="file" id="delete-file" name="file" accept=".csv" required><br><br>
+                
+                <button type="submit" class="delete-button">Upload and Delete Skills</button>
+            </form>
 			
 			<div th:if="${errorMessage}" style = "color:red;">
 				<p th:text="${errorMessage}"></p>
