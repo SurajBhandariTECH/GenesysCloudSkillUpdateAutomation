@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Update Users</title>
+</head>
+<body>
+<h1>Bulk Update Users</h1>
+<p>Upload a CSV file with columns: <b>username, officialName, employeeId</b>.</p>
+<form action="/upload" method="POST" enctype="multipart/form-data">
+    <label for="file">Select CSV File:</label>
+    <input type="file" id="file" name="file" accept=".csv" required>
+    <button type="submit">Upload and Update Users</button>
+</form>
+
+<div th:if="${successMessage}" style="color: green;">
+    <p th:text="${successMessage}"></p>
+</div>
+
+<div th:if="${errorMessage}" style="color: red;">
+    <p th:text="${errorMessage}"></p>
+</div>
+</body>
+</html>
