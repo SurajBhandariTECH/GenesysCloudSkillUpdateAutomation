@@ -8,15 +8,13 @@ import com.mypurecloud.sdk.v2.api.UsersApi;
 import com.mypurecloud.sdk.v2.model.UpdateUser;
 import com.mypurecloud.sdk.v2.model.User;
 import com.mypurecloud.sdk.v2.model.UserEntityListing;
-import org.apache.poi.ss.usermodel.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -43,87 +41,118 @@ public class UserService {
         UsersApi usersApi = new UsersApi();
         StringBuilder result = new StringBuilder();
 
+        // Step 1: Fetch all users from Genesys Cloud
+        Map<String, User> usersMap = fetchAllUsers(usersApi);
+
+        // Step 2: Parse the CSV file
+        List<String[]> csvData = parseCsv(file, result);
+        System.out.println(usersMap.size());
+
+        ExecutorService executorService = Executors.newFixedThreadPool(10);//allow parallel processing
+        for(String[] row: csvData){
+            executorService.execute(()->{
+                String email = row[0];
+                String officialName = row[1];
+                String employeeId = row[2];
+
+                User matchUser = usersMap.get(email);
+                Integer version = matchUser.getVersion();
+
+                System.out.println(version);
+                if(null != matchUser){
+                    try{
+                        UpdateUser updateUser = new UpdateUser();
+                        updateUser.version(version);
+                        updateUser.setEmployerInfo(matchUser.getEmployerInfo());
+                        updateUser.getEmployerInfo().setOfficialName(officialName);
+                        updateUser.getEmployerInfo().setEmployeeId(employeeId);
+
+                        usersApi.patchUser(matchUser.getId(),updateUser);
+                        synchronized (result){
+                            result.append("update User: ").append(matchUser.getName()).append(" Email: ").append(email).append(".\n");
+                        }
+                    }catch(ApiException | IOException e){
+                        result.append("Failed to update User: ").append(matchUser.getName()).append(" Email: ").append(email).append(" (Error: ").append(e.getMessage()).append(").\n");
+                    }
+                }else {
+                    synchronized (result) {
+                        result.append("User not found for email: ").append(email).append(".\n");
+                    }
+                }
+            });
+        }
+        executorService.shutdown();
+        while (!executorService.isTerminated()) {
+            // Wait for all tasks to finish
+        }
+        return result.toString();
+    }
+
+    private Map<String, User> fetchAllUsers(UsersApi usersApi) throws ApiException, IOException {
+        Map<String, User> usersMap = new HashMap<>();
+        int pageSize = 10; // Max allowed page size
+        int pageNumber = 1;
+        List<String> employerInfo = Arrays.asList("employerInfo");
+
+        while (true) {
+            UserEntityListing userListing = usersApi.getUsers(pageSize, pageNumber, null, null, null, employerInfo, null, null);
+            if (userListing.getEntities() != null) {
+                for (User user : userListing.getEntities()) {
+                    if (user.getEmail() != null) {
+                        usersMap.put(user.getEmail(), user); // Use email as key
+                    }
+                }
+            }
+            if (userListing.getEntities() == null || userListing.getEntities().isEmpty()) {
+                break; // No more users to fetch
+            }
+            pageNumber++;
+
+
+
+
+        }
+        return usersMap;
+    }
+
+    private List<String[]> parseCsv(MultipartFile file, StringBuilder result) throws Exception {
+        List<String[]> csvData = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
             String headerLine = reader.readLine();
 
             // Validate headers
             if (headerLine == null || !validateHeaders(headerLine)) {
-                throw new IllegalArgumentException("Invalid File Format: Headers must be 'username', 'officialName', 'employeeId'.");
+                throw new IllegalArgumentException("Invalid File Format: Headers must be 'email', 'officialName', 'employeeId'.");
             }
 
-            List<String[]> csvData = new ArrayList<>();
             String line;
+            int rowCount = 1;
             while ((line = reader.readLine()) != null) {
+                rowCount++;
                 String[] columns = line.split(",");
                 if (columns.length >= 3 && !columns[0].trim().isEmpty() && !columns[1].trim().isEmpty() && !columns[2].trim().isEmpty()) {
                     csvData.add(new String[]{columns[0].trim(), columns[1].trim(), columns[2].trim()});
                 } else {
-                    result.append("Skipped row: Missing values or incorrect format.\n");
+                    result.append("Row ").append(rowCount).append(": Skipped due to missing values or invalid format.\n");
                 }
             }
-
-            // Process updates concurrently
-            ExecutorService executorService = Executors.newFixedThreadPool(10); // Allow 10 parallel threads
-            for (String[] userData : csvData) {
-                executorService.execute(() -> {
-                    try {
-                        String username = userData[0];
-                        String officialName = userData[1];
-                        String employeeId = userData[2];
-
-                        // Fetch user by username
-                        User user = getUserByUsername(usersApi, username);
-                        System.out.println(user);
-                        if (user == null) {
-                            synchronized (result) {
-                                result.append("User not found for username ").append(username).append(".\n");
-                            }
-                            return;
-                        }
-
-                        // Update employerInfo
-                        UpdateUser updateUser = new UpdateUser();
-                        updateUser.setEmployerInfo(user.getEmployerInfo());
-                        updateUser.getEmployerInfo().setOfficialName(officialName);
-                        updateUser.getEmployerInfo().setEmployeeId(employeeId);
-
-                        usersApi.patchUser(user.getId(), updateUser);
-                        synchronized (result) {
-                            result.append("Updated user ").append(username).append(".\n");
-                        }
-
-                    } catch (ApiException | IOException e) {
-                        synchronized (result) {
-                            result.append("Failed to update user ").append(userData[0]).append(" (Error: ").append(e.getMessage()).append(").\n");
-                        }
-                    }
-                });
-            }
-
-            executorService.shutdown();
-            while (!executorService.isTerminated()) {
-                // Wait for all tasks to finish
-            }
-
-        } catch (Exception e) {
-            throw new RuntimeException("Error processing CSV file: " + e.getMessage());
         }
-
-        return result.toString();
+        return csvData;
     }
 
-    private User getUserByUsername(UsersApi usersApi, String username) throws ApiException, IOException {
-        UserEntityListing userList = usersApi.getUsers(25, 1, null, null, "username:" + username, null, null, null);
-        if (userList.getEntities() != null && !userList.getEntities().isEmpty()) {
-            return userList.getEntities().get(0); // Return the first matched user
-        }
-        return null; // User not found
-    }
+//    private User getUserByUsername(UsersApi usersApi, String username) throws ApiException, IOException {
+//        UserEntityListing userList = usersApi.getUsers(25, 1, null, null, "username:" + username, null, null, null);
+//        if (userList.getEntities() != null && !userList.getEntities().isEmpty()) {
+//            return userList.getEntities().get(0); // Return the first matched user
+//        }
+//        return null; // User not found
+//    }
 
     private boolean validateHeaders(String headerLine) {
+        headerLine = headerLine.replace("\uFFFF","");
         String[] headers = headerLine.split(",");
         return headers.length >= 3 &&
-                headers[0].equalsIgnoreCase("username") &&
+                headers[0].equalsIgnoreCase("email") &&
                 headers[1].equalsIgnoreCase("officialName") &&
                 headers[2].equalsIgnoreCase("employeeId");
     }
