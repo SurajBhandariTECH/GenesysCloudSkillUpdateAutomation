@@ -47,9 +47,16 @@ public class UserService {
         List<String[]> csvData = parseCsv(file, result);
 
         int rowIndex = 1;
+        Set<String> processedEmails = new HashSet<>();
         // Step 3: Process updates sequentially
         for (String[] row : csvData) {
             String email = row[0].trim().toLowerCase();
+            if (processedEmails.contains(email)) {
+                result.append("Duplicate email skipped: ").append(email).append(".\n");
+                continue; // Skip duplicate emails
+            }
+            processedEmails.add(email);
+           
             String officialName = row[1];
             String employeeId = row[2];
 
