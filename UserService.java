@@ -5,6 +5,7 @@ import com.mypurecloud.sdk.v2.ApiClient;
 import com.mypurecloud.sdk.v2.ApiException;
 import com.mypurecloud.sdk.v2.Configuration;
 import com.mypurecloud.sdk.v2.api.UsersApi;
+import com.mypurecloud.sdk.v2.model.EmployerInfo;
 import com.mypurecloud.sdk.v2.model.UpdateUser;
 import com.mypurecloud.sdk.v2.model.User;
 import com.mypurecloud.sdk.v2.model.UserEntityListing;
@@ -15,8 +16,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 @Service
 public class UserService {
@@ -46,45 +45,54 @@ public class UserService {
 
         // Step 2: Parse the CSV file
         List<String[]> csvData = parseCsv(file, result);
-        System.out.println(usersMap.size());
 
-        ExecutorService executorService = Executors.newFixedThreadPool(10);//allow parallel processing
-        for(String[] row: csvData){
-            executorService.execute(()->{
-                String email = row[0];
-                String officialName = row[1];
-                String employeeId = row[2];
+        int rowIndex = 1;
+        // Step 3: Process updates sequentially
+        for (String[] row : csvData) {
+            String email = row[0].trim().toLowerCase();
+            String officialName = row[1];
+            String employeeId = row[2];
 
-                User matchUser = usersMap.get(email);
-                Integer version = matchUser.getVersion();
+            // Check if the user exists in the map
+            User matchUser = usersMap.get(email);
+            System.out.println("excel email "+email);
+//            System.out.println(matchUser);
+           System.out.println(matchUser.getEmail());
 
-                System.out.println(version);
-                if(null != matchUser){
-                    try{
-                        UpdateUser updateUser = new UpdateUser();
-                        updateUser.version(version);
-                        updateUser.setEmployerInfo(matchUser.getEmployerInfo());
-                        updateUser.getEmployerInfo().setOfficialName(officialName);
-                        updateUser.getEmployerInfo().setEmployeeId(employeeId);
+            if (matchUser != null) {
+                try {
+                    // Retrieve the user version
+                    Integer version = matchUser.getVersion();
 
-                        usersApi.patchUser(matchUser.getId(),updateUser);
-                        synchronized (result){
-                            result.append("update User: ").append(matchUser.getName()).append(" Email: ").append(email).append(".\n");
-                        }
+                    // Prepare the user update object
+                    UpdateUser updateUser = new UpdateUser();
+                    updateUser.version(version);
+                    if(matchUser.getEmployerInfo()==null){
+                        EmployerInfo employerInfo = new EmployerInfo();
+                        employerInfo.setOfficialName("");
+                        employerInfo.setEmployeeId("");
+                        matchUser.setEmployerInfo(employerInfo);
+                    }
+                    updateUser.setEmployerInfo(matchUser.getEmployerInfo());
+                    updateUser.getEmployerInfo().setOfficialName(officialName);
+                    updateUser.getEmployerInfo().setEmployeeId(employeeId);
+
+
+                    usersApi.patchUser(matchUser.getId(),updateUser);
+
+                    result.append("Row ").append(rowIndex).append("- Update User: ").append(matchUser.getName()).append(" Email: ").append(email).append(".\n");
+
                     }catch(ApiException | IOException e){
-                        result.append("Failed to update User: ").append(matchUser.getName()).append(" Email: ").append(email).append(" (Error: ").append(e.getMessage()).append(").\n");
+                        result.append("\nRow ").append(rowIndex).append("- Failed to update User: ").append(matchUser.getName()).append(" Email: ").append(email).append(" (Error: ").append(e.getMessage()).append("\n");
                     }
                 }else {
-                    synchronized (result) {
-                        result.append("User not found for email: ").append(email).append(".\n");
-                    }
+                        result.append("\nRow ").append(rowIndex).append("- User not found for email: ").append(email).append(".\n");
+
                 }
-            });
+            rowIndex++;
+
         }
-        executorService.shutdown();
-        while (!executorService.isTerminated()) {
-            // Wait for all tasks to finish
-        }
+
         return result.toString();
     }
 
@@ -99,7 +107,7 @@ public class UserService {
             if (userListing.getEntities() != null) {
                 for (User user : userListing.getEntities()) {
                     if (user.getEmail() != null) {
-                        usersMap.put(user.getEmail(), user); // Use email as key
+                        usersMap.put(user.getEmail().trim().toLowerCase(), user); // Use email as key
                     }
                 }
             }
@@ -119,6 +127,7 @@ public class UserService {
         List<String[]> csvData = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
             String headerLine = reader.readLine();
+            headerLine = headerLine.replace("\uFFFF","");
 
             // Validate headers
             if (headerLine == null || !validateHeaders(headerLine)) {
@@ -133,7 +142,7 @@ public class UserService {
                 if (columns.length >= 3 && !columns[0].trim().isEmpty() && !columns[1].trim().isEmpty() && !columns[2].trim().isEmpty()) {
                     csvData.add(new String[]{columns[0].trim(), columns[1].trim(), columns[2].trim()});
                 } else {
-                    result.append("Row ").append(rowCount).append(": Skipped due to missing values or invalid format.\n");
+                    result.append("\nRow ").append(rowCount).append(": Skipped due to missing values or invalid format.\n");
                 }
             }
         }
@@ -150,7 +159,7 @@ public class UserService {
 
     private boolean validateHeaders(String headerLine) {
         headerLine = headerLine.replace("\uFFFF","");
-        String[] headers = headerLine.split(",");
+        String[] headers = headerLine.trim().split(",");
         return headers.length >= 3 &&
                 headers[0].equalsIgnoreCase("email") &&
                 headers[1].equalsIgnoreCase("officialName") &&
