@@ -8,8 +8,8 @@
 		<version>3.4.0</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.example</groupId>
-	<artifactId>Bulk_Skill_Creation2</artifactId>
+	<groupId>com.surajDev</groupId>
+	<artifactId>GenesysCloudBulkImportFeature</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>Bulk_Skill_Creation2</name>
 	<description>Spring Project for Bulk Creation</description>
@@ -126,6 +126,12 @@
         </exclusion>
     </exclusions>
 		</dependency>
+		
+	<dependency>
+    	<groupId>com.opencsv</groupId>
+    	<artifactId>opencsv</artifactId>
+    	<version>5.7.1</version>  <!-- Latest stable version -->
+	</dependency>
 	
 	</dependencies>
 
