@@ -23,31 +23,40 @@
 				<h2 th:text="${confirmationMessage}"></h2> <!-- Show confirmation message -->
 				
 		    <!-- Form for Bulk Import Skill -->
-		    <form method="GET" action="/skills/upload">
+		    <form method="GET" action="/genesysContactCenter/upload">
 		        <input type="hidden" name="organizationName" th:value="${organizationName}">
 		        <input type="hidden" name="environment" th:value="${environment}">
 		        <button type="submit">1. Bulk Import Skill</button>
 		    </form>
 		
 		    <!-- Form for Bulk Import Language Skill -->
-		    <form method="GET" action="/skills/uploadLanguageSkill">
+		    <form method="GET" action="/genesysContactCenter/uploadLanguageSkill">
 		        <input type="hidden" name="organizationName" th:value="${organizationName}">
 		        <input type="hidden" name="environment" th:value="${environment}">
 		        <button type="submit">2. Bulk Import Language Skill</button>
 		    </form>
 		
 		    <!-- Form for Bulk Import Wrap-Up Code -->
-		    <form method="GET" action="/skills/uploadWrapUpCode">
+		    <form method="GET" action="/genesysContactCenter/uploadWrapUpCode">
 		        <input type="hidden" name="organizationName" th:value="${organizationName}">
 		        <input type="hidden" name="environment" th:value="${environment}">
 		        <button type="submit">3. Bulk Import Wrap-Up Code</button>
 		    </form>
-		
-				  <form th:action="@{/skills/importOptions}" method="get">
-				<input type="hidden" th:name="organizationName" th:value="${organizationName}">
-				<input type="hidden" th:name="environment" th:value="${environment}">
-				<a href="/skills/login" class="button">Go Back to Login</a>
-			</form> 
+		    
+		    <form method="GET" action="/genesysContactCenter/uploadUser">
+		    	<input type="hidden" name="organizationName" th:value="${organizationName}">
+		        <input type="hidden" name="environment" th:value="${environment}">
+		    	<button type="submit">4. User EmployerInfo Updation</button>
+		    </form>
+
+			<!-- Form for Agent Export (Newly Added) -->
+            <form method="GET" th:action="@{/genesysContactCenter/agentExportPage}">
+                <input type="hidden" th:name="organizationName" th:value="${organizationName}">
+                <input type="hidden" th:name="environment" th:value="${environment}">
+                <button type="submit">5. Agent Export</button>
+            </form>
+            
+            	<a href="/genesysContactCenter/logout" class ="button">Logout</a>
 		</section>
 	</main>
 </body>
